@@ -343,7 +343,7 @@ async function guardarEnSheets(){
   ];
   try{
     const resp=await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Hoja%201!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
       { method:'POST',
         headers:{'Authorization':'Bearer '+gToken,'Content-Type':'application/json'},
         body:JSON.stringify({values:[fila]})
