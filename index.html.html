@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Etiqueta Alamé Logistics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f2f0eb;--surface:#fff;--border:#d6d3cc;
+  --text:#1a1a18;--muted:#6b6b66;--accent:#1a1a18;
+  --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;
+  display:grid;grid-template-columns:340px 1fr;gap:0}
+.panel{background:var(--surface);border-right:1px solid var(--border);padding:24px 20px;
+  overflow-y:auto;height:100vh;position:sticky;top:0}
+.panel-header{margin-bottom:24px}
+.panel-header h1{font-size:15px;font-weight:600;letter-spacing:-.02em}
+.panel-header p{font-size:12px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
+.section{margin-bottom:20px}
+.section-label{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;
+  color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;font-family:var(--mono)}
+.field input,.field select,.field textarea{width:100%;font-family:var(--font);font-size:13px;
+  padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);
+  color:var(--text);outline:none;transition:border-color .15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);background:#fff}
+.field textarea{resize:vertical;min-height:48px}
+.code-row{display:flex;gap:6px}
+.code-row select{width:70px;flex-shrink:0}
+.code-row input{flex:1}
+.btn-dl{width:100%;padding:11px;background:var(--text);color:#fff;font-family:var(--font);
+  font-size:13px;font-weight:500;border:none;border-radius:8px;cursor:pointer;margin-top:8px;
+  transition:opacity .15s,transform .1s}
+.btn-dl:hover{opacity:.88}
+.btn-dl:active{transform:scale(.98)}
+.btn-dl:disabled{opacity:.5;cursor:not-allowed}
+.btn-clear{width:100%;padding:9px;background:transparent;color:var(--muted);font-family:var(--font);
+  font-size:12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;margin-top:6px;
+  transition:background .15s,color .15s,border-color .15s}
+.btn-clear:hover{background:#fff0f0;color:#c0392b;border-color:#c0392b}
+.btn-login{width:100%;padding:9px;background:#fff;color:var(--text);font-family:var(--font);
+  font-size:12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;margin-top:6px;
+  display:flex;align-items:center;justify-content:center;gap:8px;transition:background .15s}
+.btn-login:hover{background:#f5f4f0}
+.drive-status{font-size:11px;font-family:var(--mono);padding:7px 10px;border-radius:6px;
+  margin-top:8px;text-align:center}
+.drive-ok{background:#eaf3de;color:#27500a}
+.drive-off{background:#fef3cd;color:#856404}
+#msg{text-align:center;font-size:11px;font-family:var(--mono);color:var(--muted);margin-top:8px;min-height:16px}
+.preview-area{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 24px;min-height:100vh;background:var(--bg)}
+.preview-label{font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:16px;letter-spacing:.05em}
+.preview-shadow{box-shadow:0 8px 40px rgba(0,0,0,.12),0 2px 8px rgba(0,0,0,.08);border-radius:4px;overflow:hidden}
+canvas{display:block}
+.preview-hint{margin-top:14px;font-size:11px;font-family:var(--mono);color:var(--muted);text-align:center;line-height:1.6}
+</style>
+</head>
+<body>
+
+<div class="panel">
+  <div class="panel-header">
+    <h1>Alamé Logistics</h1>
+    <p>Editor de etiquetas · 100×150mm</p>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Encabezado</div>
+    <div class="field"><label>Empresa</label><input id="empresa" value="ALAMÉ LOGISTICS"></div>
+    <div class="field">
+      <label>Código de pedido</label>
+      <div class="code-row">
+        <select id="pfx"><option>AL</option><option>NI</option></select>
+        <input id="num" value="" placeholder="ej. ABC123">
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Vendedor y fecha</div>
+    <div class="field"><label>Vendedor</label><input id="vendedor" value="Tienda Directa Ar"></div>
+    <div class="field"><label>Fecha (automática)</label><input id="fecha"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Datos del cliente</div>
+    <div class="field"><label>Nombre</label><input id="nombre" value=""></div>
+    <div class="field"><label>Teléfono</label><input id="tel" value=""></div>
+    <div class="field"><label>Dirección</label><input id="dir" value=""></div>
+    <div class="field"><label>Localidad</label><input id="loc" value=""></div>
+    <div class="field"><label>Entre calles</label><input id="entre" value=""></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Envío y pago</div>
+    <div class="field"><label>Tipo de envío</label><input id="envio" value="VENTA"></div>
+    <div class="field"><label>Forma de pago</label>
+      <select id="pago"><option>COBRAR AL ENTREGAR</option><option>PAGADO</option></select>
+    </div>
+    <div class="field"><label>Monto</label><input id="monto" value=""></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Producto</div>
+    <div class="field"><label>Lote</label>
+      <select id="prod">
+        <option>Lote - 20 Patch + REGALO</option>
+        <option>Lote - 30 Patch + REGALO</option>
+        <option>Lote - 40 Patch + REGALO</option>
+        <option>Lote - 50 Patch + REGALO</option>
+        <option>Lote - 60 Patch + REGALO</option>
+        <option>Lote - 100 Patch + REGALO</option>
+      </select>
+    </div>
+    <div class="field"><label>Observación extra</label><textarea id="obs" placeholder="opcional..."></textarea></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Cupón de regalo</div>
+    <div class="field"><label>Texto del cupón</label><input id="cupon" value="10 Parches de REGALO en tu proxima compra"></div>
+    <div class="field"><label>Mostrar cupón</label>
+      <select id="showCupon"><option value="1">Sí</option><option value="0">No</option></select>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Google Drive</div>
+    <div id="driveStatus" class="drive-status drive-off">⚠ No conectado a Drive</div>
+    <button class="btn-login" id="btnLogin" onclick="loginGoogle()">
+      <svg width="16" height="16" viewBox="0 0 48 48"><path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-21 0-1.3-.2-2.7-.5-4z"/></svg>
+      Conectar con Google
+    </button>
+    <button class="btn-login" id="btnLogout" onclick="logoutGoogle()" style="display:none">
+      Desconectar cuenta
+    </button>
+  </div>
+
+  <button class="btn-dl" onclick="genPDF()" id="btnGen">↓ Descargar PDF</button>
+  <button class="btn-clear" onclick="limpiarDatos()">✕ Limpiar datos</button>
+  <div id="msg"></div>
+</div>
+
+<div class="preview-area">
+  <div class="preview-label">VISTA PREVIA EN TIEMPO REAL</div>
+  <div class="preview-shadow"><canvas id="cv"></canvas></div>
+  <div class="preview-hint">100 × 150 mm · Impresora térmica · Blanco y negro</div>
+</div>
+
+<script>
+// ── CONFIG ───────────────────────────────────────────────────────────────
+const CLIENT_ID  = '615812449397-ku43gf36pjp58m8d3kmrt5scepghp9af.apps.googleusercontent.com';
+const SHEET_ID   = '1ZC03kRUaEbPJiOBiBCzDnvN5XtCu5ieAKNvfndEwma8';
+const SCOPE      = 'https://www.googleapis.com/auth/spreadsheets';
+
+// ── CANVAS ───────────────────────────────────────────────────────────────
+const cv = document.getElementById('cv');
+const cx = cv.getContext('2d');
+const MM = 96/25.4;
+const W  = Math.round(100*MM), H = Math.round(150*MM);
+cv.width=W; cv.height=H;
+cv.style.width=Math.round(W*.82)+'px'; cv.style.height=Math.round(H*.82)+'px';
+
+(function(){
+  const d=new Date();
+  document.getElementById('fecha').value=
+    String(d.getDate()).padStart(2,'0')+'/'+
+    String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+})();
+
+function g(id){return document.getElementById(id).value.trim();}
+function cod(){return g('pfx')+'-'+g('num');}
+
+function wrap(txt,maxW,sz){
+  cx.font=sz+'px sans-serif';
+  const words=txt.split(' '),lines=[];let line='';
+  for(const w of words){
+    const t=line?line+' '+w:w;
+    if(cx.measureText(t).width>maxW&&line){lines.push(line);line=w;}else line=t;
+  }
+  if(line)lines.push(line);return lines;
+}
+function rrect(x,y,w,h,r){
+  cx.beginPath();cx.moveTo(x+r,y);
+  cx.lineTo(x+w-r,y);cx.arcTo(x+w,y,x+w,y+r,r);
+  cx.lineTo(x+w,y+h-r);cx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  cx.lineTo(x+r,y+h);cx.arcTo(x,y+h,x,y+h-r,r);
+  cx.lineTo(x,y+r);cx.arcTo(x,y,x+r,y,r);cx.closePath();
+}
+function barcode(x,y,bw,bh,text){
+  const seed=text.split('').reduce((a,c)=>a+c.charCodeAt(0),0);
+  let px=x;const unit=bw/62;
+  for(let i=0;i<62;i++){
+    const thick=((seed*(i+1)*7+i*13)%3===0);
+    cx.fillStyle=i%2===0?'#000':'#fff';
+    const bww=thick?unit*1.7:unit*.85;
+    cx.fillRect(Math.round(px),y,Math.ceil(bww),bh);
+    px+=bww;if(px>=x+bw)break;
+  }
+  cx.fillStyle='#000';cx.font=Math.round(2*MM)+'px monospace';
+  cx.textAlign='center';cx.fillText(text,x+bw/2,y+bh+Math.round(2.5*MM));
+}
+
+function draw(){
+  cx.clearRect(0,0,W,H);cx.fillStyle='#fff';cx.fillRect(0,0,W,H);
+  const P=Math.round(4*MM),IW=W-P*2;let y=0;
+  cx.strokeStyle='#000';cx.lineWidth=2.5;cx.strokeRect(1.5,1.5,W-3,H-3);
+  cx.lineWidth=.7;cx.strokeRect(5,5,W-10,H-10);
+  y=Math.round(7.5*MM);
+  cx.fillStyle='#000';cx.font='bold '+Math.round(6.2*MM)+'px sans-serif';
+  cx.textAlign='center';cx.fillText(g('empresa'),W/2,y);y+=Math.round(5.5*MM);
+  cx.font=Math.round(3.2*MM)+'px sans-serif';cx.fillText(cod(),W/2,y);y+=Math.round(4*MM);
+  cx.font='bold '+Math.round(2.4*MM)+'px sans-serif';
+  cx.fillText('- ETIQUETA DE ENVIO -',W/2,y);y+=Math.round(2.5*MM);
+  cx.lineWidth=1.5;cx.strokeStyle='#000';
+  cx.beginPath();cx.moveTo(P,y);cx.lineTo(W-P,y);cx.stroke();y+=1.5;
+  cx.lineWidth=.4;cx.beginPath();cx.moveTo(P,y+Math.round(1*MM));cx.lineTo(W-P,y+Math.round(1*MM));cx.stroke();
+  y+=Math.round(3.5*MM);
+  const rowH=Math.round(7*MM);
+  cx.fillStyle='#f2f2f2';cx.fillRect(P,y,IW,rowH);
+  cx.strokeStyle='#ccc';cx.lineWidth=.4;cx.strokeRect(P,y,IW,rowH);
+  const ry=y+Math.round(4.8*MM);
+  cx.fillStyle='#000';cx.font='bold '+Math.round(2.8*MM)+'px sans-serif';
+  cx.textAlign='left';cx.fillText('Vendedor: ',P+Math.round(2*MM),ry);
+  cx.font=Math.round(2.8*MM)+'px sans-serif';
+  cx.fillText(g('vendedor'),P+Math.round(2*MM)+cx.measureText('Vendedor: ').width,ry);
+  cx.font='bold '+Math.round(2.8*MM)+'px sans-serif';cx.textAlign='right';
+  cx.fillText('Fecha: '+g('fecha'),W-P-Math.round(2*MM),ry);
+  y+=rowH+Math.round(1*MM);
+  cx.strokeStyle='#000';cx.lineWidth=1.5;
+  cx.beginPath();cx.moveTo(P,y);cx.lineTo(W-P,y);cx.stroke();y+=Math.round(3.5*MM);
+  function row(label,val){
+    const sz=Math.round(2.9*MM);
+    cx.font='bold '+sz+'px sans-serif';cx.fillStyle='#000';cx.textAlign='left';
+    const lw=cx.measureText(label+' ').width;cx.fillText(label+' ',P,y+sz);
+    cx.font=sz+'px sans-serif';
+    const lines=wrap(val,IW-lw-2,sz);cx.fillText(lines[0]||'',P+lw,y+sz);
+    y+=sz+Math.round(1.8*MM);
+    for(let i=1;i<lines.length;i++){cx.fillText(lines[i],P+lw,y+sz);y+=sz+Math.round(1.5*MM);}
+  }
+  row('Nombre:',g('nombre'));row('Tel:',g('tel'));row('Dir:',g('dir'));
+  row('Localidad:',g('loc'));row('Entre:',g('entre'));
+  y+=Math.round(1*MM);cx.strokeStyle='#000';cx.lineWidth=1.5;
+  cx.beginPath();cx.moveTo(P,y);cx.lineTo(W-P,y);cx.stroke();y+=Math.round(3*MM);
+  const esz=Math.round(2.9*MM);cx.font='bold '+esz+'px sans-serif';
+  cx.fillStyle='#000';cx.textAlign='left';cx.fillText('Envio: '+g('envio'),P,y+esz);
+  const pv=g('pago'),isPagado=pv==='PAGADO';
+  const pvW=cx.measureText(pv).width+Math.round(4*MM),pvX=W-P-pvW;
+  if(isPagado){cx.fillStyle='#000';rrect(pvX,y,pvW,esz+Math.round(1.5*MM),Math.round(1.5*MM));
+    cx.fill();cx.fillStyle='#fff';}
+  else{cx.fillStyle='#fff';rrect(pvX,y,pvW,esz+Math.round(1.5*MM),Math.round(1.5*MM));
+    cx.fill();cx.strokeStyle='#000';cx.lineWidth=1.2;
+    rrect(pvX,y,pvW,esz+Math.round(1.5*MM),Math.round(1.5*MM));cx.stroke();cx.fillStyle='#000';}
+  cx.font='bold '+esz+'px sans-serif';cx.textAlign='center';cx.fillText(pv,pvX+pvW/2,y+esz);
+  y+=esz+Math.round(3.5*MM);
+  cx.font='bold '+Math.round(10.5*MM)+'px sans-serif';cx.fillStyle='#000';cx.textAlign='center';
+  cx.fillText(g('monto'),W/2,y+Math.round(10.5*MM));y+=Math.round(10.5*MM)+Math.round(3*MM);
+  cx.strokeStyle='#000';cx.lineWidth=.8;cx.setLineDash([4,3]);
+  cx.beginPath();cx.moveTo(P,y);cx.lineTo(W-P,y);cx.stroke();cx.setLineDash([]);y+=Math.round(2.5*MM);
+  const obsH=Math.round(12*MM);cx.strokeStyle='#000';cx.lineWidth=.8;cx.strokeRect(P,y,IW,obsH);
+  cx.font='bold '+Math.round(2.4*MM)+'px sans-serif';cx.fillStyle='#000';cx.textAlign='left';
+  cx.fillText('OBS:',P+Math.round(2*MM),y+Math.round(4*MM));
+  cx.font='bold '+Math.round(3.1*MM)+'px sans-serif';
+  cx.fillText(g('prod'),P+Math.round(2*MM),y+Math.round(9.5*MM));
+  const obs=g('obs');
+  if(obs){const ow=cx.measureText(g('prod')).width;
+    cx.font=Math.round(2.5*MM)+'px sans-serif';cx.fillStyle='#444';
+    cx.fillText(obs,P+Math.round(2*MM)+ow+Math.round(3*MM),y+Math.round(9.5*MM));}
+  y+=obsH+Math.round(2.5*MM);
+  if(g('showCupon')==='1'){
+    const cH=Math.round(13*MM);cx.strokeStyle='#000';cx.lineWidth=1;cx.setLineDash([5,3]);
+    cx.strokeRect(P,y,IW,cH);cx.setLineDash([]);
+    cx.font='bold '+Math.round(2.5*MM)+'px sans-serif';cx.fillStyle='#000';cx.textAlign='center';
+    cx.fillText('-- CUPON DE REGALO --',W/2,y+Math.round(4.5*MM));
+    cx.font='bold '+Math.round(3.2*MM)+'px sans-serif';
+    cx.fillText(g('cupon'),W/2,y+Math.round(10*MM));y+=cH+Math.round(2*MM);
+  }
+  barcode(P,H-Math.round(9*MM)-Math.round(6*MM),IW,Math.round(6*MM),cod());
+}
+
+// ── GOOGLE AUTH ──────────────────────────────────────────────────────────
+let gToken = null;
+
+function loginGoogle(){
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPE,
+    callback: (resp) => {
+      if(resp.error){ setDriveStatus(false); return; }
+      gToken = resp.access_token;
+      setDriveStatus(true);
+    }
+  });
+  client.requestAccessToken();
+}
+
+function logoutGoogle(){
+  if(gToken) google.accounts.oauth2.revoke(gToken);
+  gToken=null;
+  setDriveStatus(false);
+}
+
+function setDriveStatus(ok){
+  const st=document.getElementById('driveStatus');
+  const bl=document.getElementById('btnLogin');
+  const bo=document.getElementById('btnLogout');
+  if(ok){
+    st.className='drive-status drive-ok';
+    st.textContent='✓ Conectado a Google Drive';
+    bl.style.display='none';
+    bo.style.display='flex';
+  } else {
+    st.className='drive-status drive-off';
+    st.textContent='⚠ No conectado a Drive';
+    bl.style.display='flex';
+    bo.style.display='none';
+  }
+}
+
+// ── SEMANA ───────────────────────────────────────────────────────────────
+function getSemana(fechaStr){
+  const p=fechaStr.split('/');
+  const d=new Date(+p[2],+p[1]-1,+p[0]);
+  const dom=new Date(d); dom.setDate(d.getDate()-d.getDay());
+  const dd=String(dom.getDate()).padStart(2,'0');
+  const mm=String(dom.getMonth()+1).padStart(2,'0');
+  return `Semana del ${dd}/${mm}/${dom.getFullYear()}`;
+}
+
+// ── GUARDAR EN SHEETS ────────────────────────────────────────────────────
+async function guardarEnSheets(){
+  if(!gToken) return false;
+  const fecha=g('fecha');
+  const semana=getSemana(fecha);
+  const fila=[
+    semana, semana.replace('Semana del ',''), fecha,
+    cod(), g('nombre'), g('tel'), g('dir'), g('loc'), g('entre'),
+    g('envio'), g('pago'), g('monto'), g('prod'), g('obs'), g('cupon')
+  ];
+  try{
+    const resp=await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Sheet1!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+      { method:'POST',
+        headers:{'Authorization':'Bearer '+gToken,'Content-Type':'application/json'},
+        body:JSON.stringify({values:[fila]})
+      }
+    );
+    return resp.ok;
+  }catch(e){console.error(e);return false;}
+}
+
+// ── LIMPIAR ──────────────────────────────────────────────────────────────
+function limpiarDatos(){
+  ['nombre','tel','dir','loc','entre','monto','obs','num'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
+  document.getElementById('pfx').value='AL';
+  document.getElementById('pago').value='COBRAR AL ENTREGAR';
+  document.getElementById('prod').selectedIndex=0;
+  document.getElementById('showCupon').value='1';
+  const msg=document.getElementById('msg');
+  msg.textContent='✓ Datos limpiados';
+  setTimeout(()=>msg.textContent='',2500);
+  draw();
+}
+
+// ── GENERAR PDF ──────────────────────────────────────────────────────────
+async function genPDF(){
+  const msg=document.getElementById('msg');
+  const btn=document.getElementById('btnGen');
+  btn.disabled=true;
+  msg.textContent='Generando PDF...';
+  try{
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({unit:'mm',format:[100,150],orientation:'portrait'});
+    const PD=4,IW=92;
+    doc.setLineWidth(.7);doc.rect(.5,.5,99,149);
+    doc.setLineWidth(.3);doc.rect(1.5,1.5,97,147);
+    let y=9;
+    doc.setFont('helvetica','bold');doc.setFontSize(16);
+    doc.text(g('empresa'),50,y,{align:'center'});y+=6;
+    doc.setFont('helvetica','normal');doc.setFontSize(9);
+    doc.text(cod(),50,y,{align:'center'});y+=4.5;
+    doc.setFont('helvetica','bold');doc.setFontSize(7.5);
+    doc.text('- ETIQUETA DE ENVIO -',50,y,{align:'center'});y+=3;
+    doc.setLineWidth(.5);doc.line(PD,y,100-PD,y);y+=.5;
+    doc.setLineWidth(.2);doc.line(PD,y+1,100-PD,y+1);y+=4;
+    doc.setFillColor(242,242,242);doc.rect(PD,y,IW,7,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(8);
+    doc.text('Vendedor: ',PD+2,y+4.8);
+    doc.setFont('helvetica','normal');
+    doc.text(g('vendedor'),PD+2+doc.getTextWidth('Vendedor: '),y+4.8);
+    doc.setFont('helvetica','bold');
+    doc.text('Fecha: '+g('fecha'),100-PD-2,y+4.8,{align:'right'});
+    y+=9;
+    doc.setLineWidth(.5);doc.line(PD,y,100-PD,y);y+=3.5;
+    function pRow(label,val){
+      if(!val)return;
+      doc.setFont('helvetica','bold');doc.setFontSize(8.5);
+      doc.text(label+' ',PD,y);
+      const lw=doc.getTextWidth(label+' ');
+      doc.setFont('helvetica','normal');
+      const lines=doc.splitTextToSize(val,IW-lw-1);
+      doc.text(lines[0]||'',PD+lw,y);y+=4.5;
+      for(let i=1;i<lines.length;i++){doc.text(lines[i],PD+lw,y);y+=4;}
+    }
+    pRow('Nombre:',g('nombre'));pRow('Tel:',g('tel'));pRow('Dir:',g('dir'));
+    pRow('Localidad:',g('loc'));pRow('Entre:',g('entre'));
+    y+=1;doc.setLineWidth(.5);doc.line(PD,y,100-PD,y);y+=3;
+    doc.setFont('helvetica','bold');doc.setFontSize(8.5);
+    doc.text('Envio: '+g('envio'),PD,y);
+    const pv=g('pago'),isPagado=pv==='PAGADO';
+    const pvW=doc.getTextWidth(pv)+6,pvX=100-PD-pvW;
+    doc.setLineWidth(.4);
+    if(isPagado){doc.setFillColor(0,0,0);doc.roundedRect(pvX,y-3.5,pvW,5.5,1,1,'F');
+      doc.setTextColor(255,255,255);}
+    else{doc.setFillColor(255,255,255);doc.roundedRect(pvX,y-3.5,pvW,5.5,1,1,'FD');
+      doc.setTextColor(0,0,0);}
+    doc.text(pv,pvX+pvW/2,y,{align:'center'});
+    doc.setTextColor(0,0,0);y+=9;
+    doc.setFont('helvetica','bold');doc.setFontSize(26);
+    doc.text(g('monto'),50,y,{align:'center'});y+=11;
+    doc.setLineDashPattern([1.5,1],0);doc.setLineWidth(.3);doc.line(PD,y,100-PD,y);
+    doc.setLineDashPattern([],0);y+=2.5;
+    doc.setLineWidth(.4);doc.rect(PD,y,IW,12);
+    doc.setFont('helvetica','bold');doc.setFontSize(7);doc.text('OBS:',PD+2,y+4);
+    doc.setFontSize(9);doc.text(g('prod'),PD+2,y+9.5);
+    if(g('obs')){const ow=doc.getTextWidth(g('prod'));
+      doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.text(g('obs'),PD+2+ow+3,y+9.5);}
+    y+=14;
+    if(g('showCupon')==='1'){
+      doc.setLineDashPattern([2,1],0);doc.setLineWidth(.4);doc.rect(PD,y,IW,13);
+      doc.setLineDashPattern([],0);doc.setFont('helvetica','bold');doc.setFontSize(7.5);
+      doc.text('-- CUPON DE REGALO --',50,y+5,{align:'center'});
+      doc.setFontSize(9);doc.text(g('cupon'),50,y+10.5,{align:'center'});y+=15;
+    }
+    doc.setFont('helvetica','normal');doc.setFontSize(7);doc.text(cod(),50,148,{align:'center'});
+    const slug=g('nombre').replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_áéíóúÁÉÍÓÚñÑüÜ]/g,'');
+    const fileName=(slug||'cliente')+'_'+cod()+'.pdf';
+    doc.save(fileName);
+
+    // guardar en Sheets
+    if(gToken){
+      msg.textContent='✓ PDF guardado · Enviando a Drive...';
+      const ok=await guardarEnSheets();
+      msg.textContent=ok
+        ?'✓ '+fileName+' · Registro guardado en Drive ✓'
+        :'✓ '+fileName+' · Error al guardar en Drive';
+    } else {
+      msg.textContent='✓ '+fileName+' guardado (sin Drive)';
+    }
+    setTimeout(()=>msg.textContent='',5000);
+  }catch(e){
+    msg.textContent='Error: '+e.message;console.error(e);
+  }
+  btn.disabled=false;
+}
+
+// ── EVENTOS ──────────────────────────────────────────────────────────────
+['empresa','pfx','num','vendedor','fecha','nombre','tel','dir',
+ 'loc','entre','envio','pago','monto','prod','obs','cupon','showCupon']
+.forEach(id=>{
+  const el=document.getElementById(id);if(!el)return;
+  el.addEventListener('input',draw);el.addEventListener('change',draw);
+});
+
+draw();
+</script>
+</body>
+</html>
