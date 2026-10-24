@@ -122,6 +122,7 @@ canvas{display:block}
     <div class="field"><label>Dirección</label><input id="dir" value=""></div>
     <div class="field"><label>Localidad</label><input id="loc" value=""></div>
     <div class="field"><label>Entre calles</label><input id="entre" value=""></div>
+    <div class="field"><label>Referencia</label><input id="ref" value="" placeholder="ej. portón negro, barrio..."></div>
   </div>
 
   <div class="section">
@@ -280,6 +281,7 @@ function draw(){
   cx.strokeStyle='#000';cx.lineWidth=1.5;
   cx.beginPath();cx.moveTo(P,y);cx.lineTo(W-P,y);cx.stroke();y+=Math.round(3.5*MM);
   function row(label,val){
+    if(!val)return;
     const sz=Math.round(2.9*MM);
     cx.font='bold '+sz+'px sans-serif';cx.fillStyle='#000';cx.textAlign='left';
     const lw=cx.measureText(label+' ').width;cx.fillText(label+' ',P,y+sz);
@@ -289,7 +291,7 @@ function draw(){
     for(let i=1;i<lines.length;i++){cx.fillText(lines[i],P+lw,y+sz);y+=sz+Math.round(1.5*MM);}
   }
   row('Nombre:',g('nombre'));row('Tel:',g('tel'));row('Dir:',g('dir'));
-  row('Localidad:',g('loc'));row('Entre:',g('entre'));
+  row('Localidad:',g('loc'));row('Entre:',g('entre'));row('Ref:',g('ref'));
   y+=Math.round(1*MM);cx.strokeStyle='#000';cx.lineWidth=1.5;
   cx.beginPath();cx.moveTo(P,y);cx.lineTo(W-P,y);cx.stroke();y+=Math.round(3*MM);
   const esz=Math.round(2.9*MM);cx.font='bold '+esz+'px sans-serif';
@@ -309,14 +311,18 @@ function draw(){
   cx.beginPath();cx.moveTo(P,y);cx.lineTo(W-P,y);cx.stroke();cx.setLineDash([]);y+=Math.round(2.5*MM);
   const ptxt=prodTexto(),obs=g('obs');
   if(ptxt||obs){
-    const obsH=Math.round(12*MM);cx.strokeStyle='#000';cx.lineWidth=.8;cx.strokeRect(P,y,IW,obsH);
+    const szP=Math.round(3.1*MM),szO=Math.round(2.5*MM),mw=IW-Math.round(4*MM);
+    const lp=ptxt?wrap(ptxt,mw*.9,szP):[],lo=obs?wrap(obs,mw,szO):[];
+    const obsH=Math.round((8+lp.length*4.5+lo.length*4)*MM);
+    cx.strokeStyle='#000';cx.lineWidth=.8;cx.strokeRect(P,y,IW,obsH);
     cx.font='bold '+Math.round(2.4*MM)+'px sans-serif';cx.fillStyle='#000';cx.textAlign='left';
     cx.fillText('OBS:',P+Math.round(2*MM),y+Math.round(4*MM));
-    cx.font='bold '+Math.round(3.1*MM)+'px sans-serif';
-    cx.fillText(ptxt,P+Math.round(2*MM),y+Math.round(9.5*MM));
-    if(obs){const ow=ptxt?cx.measureText(ptxt).width+Math.round(3*MM):0;
-      cx.font=Math.round(2.5*MM)+'px sans-serif';cx.fillStyle='#444';
-      cx.fillText(obs,P+Math.round(2*MM)+ow,y+Math.round(9.5*MM));}
+    let ly=y+Math.round(9.5*MM);
+    cx.font='bold '+szP+'px sans-serif';cx.fillStyle='#000';
+    lp.forEach(l=>{cx.fillText(l,P+Math.round(2*MM),ly);ly+=Math.round(4.5*MM);});
+    cx.font=szO+'px sans-serif';cx.fillStyle='#444';
+    lo.forEach(l=>{cx.fillText(l,P+Math.round(2*MM),ly);ly+=Math.round(4*MM);});
+    cx.fillStyle='#000';
     y+=obsH+Math.round(2.5*MM);
   }
   if(g('showCupon')==='1'){
@@ -339,7 +345,7 @@ function formatoMonto(txt){
   return '$'+limpio.replace(/\B(?=(\d{3})+(?!\d))/g,'.');
 }
 
-const CAMPOS_PEDIDO=['pfx','num','fecha','nombre','tel','dir','loc','entre','pago','monto','prod','obs','producto'];
+const CAMPOS_PEDIDO=['pfx','num','fecha','nombre','tel','dir','loc','entre','ref','pago','monto','prod','obs','producto'];
 let cola=[],colaIdx=0;
 
 function snap(){
@@ -374,7 +380,14 @@ function parsePedido(linea){
   const ie=rest.findIndex((s,i)=>i>=idx&&s.includes('@'));
   const tras=rest.slice((ie>=0?ie:idx)+1);
   const montoCell=tras.find(s=>/^\$?\s*\d[\d.]*$/.test(s)&&s.replace(/\D/g,'').length>=3)||'';
-  const mEntre=obsCell.match(/entre\s+calles?\s*:?\s*(.+)$/i);
+  // después del " - " del texto de pago vienen las aclaraciones de entrega
+  const iNota=obsCell.search(/\s-\s/);
+  const nota=(iNota>=0?obsCell.slice(iNota).replace(/^\s-\s/,''):'').trim();
+  let entre='',ref='';
+  const mEntre=nota.match(/^entre\s+calles?\s*:?\s*(.*?)(?:\.\s+(.*))?$/i);
+  if(mEntre){entre=(mEntre[1]||'').trim();ref=(mEntre[2]||'').trim();}
+  else ref=nota;
+  entre=entre.replace(/[.\s]+$/,'');ref=ref.replace(/[.\s]+$/,'');
 
   const ult=[...c].reverse().find(x=>x)||'';
   const esProd=ult&&c.lastIndexOf(ult)>it&&!ult.includes('@')&&!/^\$?\s*[\d.,]+$/.test(ult);
@@ -384,15 +397,17 @@ function parsePedido(linea){
   const fecha=String(mf?mf[1]:hoy.getDate()).padStart(2,'0')+'/'+
               String(mf?mf[2]:hoy.getMonth()+1).padStart(2,'0')+'/'+hoy.getFullYear();
 
+  const mcod=(c[0]||'').match(/^(al|ni)\s*-?\s*(\d+)$/i);
   return {
-    pfx:g('pfx'),
-    num:/^\d{3,6}$/.test(c[0]||'')?c[0]:'',
+    pfx:mcod?mcod[1].toUpperCase():g('pfx'),
+    num:mcod?mcod[2]:(/^\d{3,6}$/.test(c[0]||'')?c[0]:''),
     fecha,
     nombre,
     tel:c[it],
     dir,
     loc:loc+(cp?' - CP '+cp:''),
-    entre:mEntre?mEntre[1].trim():'',
+    entre,
+    ref,
     pago:/^pagad[oa]/i.test(obsCell)?'PAGADO':'COBRAR AL ENTREGAR',
     monto:formatoMonto(montoCell),
     prod:document.getElementById('prod').value,
@@ -429,6 +444,7 @@ function cargarPedido(){
   if(!ok.length){out.textContent='No pude leer la fila. Copiala directo desde la planilla.';return;}
 
   cola=ok;colaIdx=0;
+  if(ok.every(o=>o.producto))document.getElementById('showLote').value='0';
   aplicar(cola[0]);
   box.value='';
   actualizarBarra();
@@ -500,7 +516,7 @@ async function guardarEnSheets(){
   const fila=[
     semana, semana.replace('Semana del ',''), fecha,
     cod(), g('nombre'), g('tel'), g('dir'), g('loc'), g('entre'),
-    g('envio'), g('pago'), g('monto'), g('prod'), g('obs'), g('cupon'), g('producto')
+    g('envio'), g('pago'), g('monto'), g('prod'), g('obs'), g('cupon'), g('producto'), g('ref')
   ];
   try{
     const resp=await fetch(
@@ -516,7 +532,7 @@ async function guardarEnSheets(){
 
 // ── LIMPIAR ──────────────────────────────────────────────────────────────
 function limpiarDatos(){
-  ['nombre','tel','dir','loc','entre','monto','obs','num','pegar','producto'].forEach(id=>{
+  ['nombre','tel','dir','loc','entre','ref','monto','obs','num','pegar','producto'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value='';
   });
   document.getElementById('pfx').value='AL';
@@ -567,7 +583,7 @@ function dibujarPDF(doc){
     for(let i=1;i<lines.length;i++){doc.text(lines[i],PD+lw,y);y+=4;}
   }
   pRow('Nombre:',g('nombre'));pRow('Tel:',g('tel'));pRow('Dir:',g('dir'));
-  pRow('Localidad:',g('loc'));pRow('Entre:',g('entre'));
+  pRow('Localidad:',g('loc'));pRow('Entre:',g('entre'));pRow('Ref:',g('ref'));
   y+=1;doc.setLineWidth(.5);doc.line(PD,y,100-PD,y);y+=3;
   doc.setFont('helvetica','bold');doc.setFontSize(8.5);
   doc.text('Envio: '+g('envio'),PD,y);
@@ -584,14 +600,21 @@ function dibujarPDF(doc){
   doc.text(g('monto'),50,y,{align:'center'});y+=11;
   doc.setLineDashPattern([1.5,1],0);doc.setLineWidth(.3);doc.line(PD,y,100-PD,y);
   doc.setLineDashPattern([],0);y+=2.5;
-  const ptxt=prodTexto();
-  if(ptxt||g('obs')){
-    doc.setLineWidth(.4);doc.rect(PD,y,IW,12);
+  const ptxt=prodTexto(),obsT=g('obs');
+  if(ptxt||obsT){
+    doc.setFont('helvetica','bold');doc.setFontSize(9);
+    const lp=ptxt?doc.splitTextToSize(ptxt,IW-4):[];
+    doc.setFont('helvetica','normal');doc.setFontSize(7.5);
+    const lo=obsT?doc.splitTextToSize(obsT,IW-4):[];
+    const bh=8+lp.length*4+lo.length*3.5;
+    doc.setLineWidth(.4);doc.rect(PD,y,IW,bh);
     doc.setFont('helvetica','bold');doc.setFontSize(7);doc.text('OBS:',PD+2,y+4);
-    doc.setFontSize(9);doc.text(ptxt,PD+2,y+9.5);
-    if(g('obs')){const ow=ptxt?doc.getTextWidth(ptxt)+3:0;
-      doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.text(g('obs'),PD+2+ow,y+9.5);}
-    y+=14;
+    let ly=y+9.5;
+    doc.setFontSize(9);
+    lp.forEach(l=>{doc.text(l,PD+2,ly);ly+=4;});
+    doc.setFont('helvetica','normal');doc.setFontSize(7.5);
+    lo.forEach(l=>{doc.text(l,PD+2,ly);ly+=3.5;});
+    y+=bh+2;
   }
   if(g('showCupon')==='1'){
     doc.setLineDashPattern([2,1],0);doc.setLineWidth(.4);doc.rect(PD,y,IW,13);
@@ -668,7 +691,7 @@ async function genPDFLote(){
 
 // ── EVENTOS ──────────────────────────────────────────────────────────────
 ['empresa','pfx','num','vendedor','fecha','nombre','tel','dir',
- 'loc','entre','envio','pago','monto','prod','obs','cupon','showCupon','producto','showProd','showLote']
+ 'loc','entre','ref','envio','pago','monto','prod','obs','cupon','showCupon','producto','showProd','showLote']
 .forEach(id=>{
   const el=document.getElementById(id);if(!el)return;
   el.addEventListener('input',draw);el.addEventListener('change',draw);
